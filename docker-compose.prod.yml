@@ -1,0 +1,19 @@
+services:
+  siwapp:
+    container_name: siwapp
+    build:
+      context: .
+      args:
+        - UID=${UID:-5002}
+        - GID=${GID:-5002}
+      dockerfile: docker/Dockerfile
+    command: elixir -S mix phx.server
+    entrypoint: ["./docker/entrypoint.sh"]
+    network_mode: host
+    env_file:
+      - .env
+    ulimits:
+      nofile: 65535
+    volumes:
+      - .:/app
+    restart: unless-stopped
