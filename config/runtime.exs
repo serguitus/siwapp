@@ -149,13 +149,44 @@ if config_env() == :prod do
           _ -> :if_available
         end
 
+      relay = System.get_env("SMTP_DOMAIN") || System.get_env("SMTP_HOST") || "localhost"
+
+      tls_options =
+        if tls != :never do
+          base_options = [
+            depth: String.to_integer(System.get_env("SMTP_TLS_DEPTH") || "99"),
+            cacerts: :public_key.cacerts_get()
+          ]
+
+          sni =
+            case System.get_env("SMTP_TLS_SNI") do
+              "false" -> nil
+              sni_host when is_binary(sni_host) and sni_host != "true" -> String.to_charlist(sni_host)
+              _ -> String.to_charlist(relay)
+            end
+
+          verify =
+            case System.get_env("SMTP_TLS_VERIFY") do
+              "verify_none" -> :verify_none
+              "false" -> :verify_none
+              _ -> :verify_peer
+            end
+
+          base_options
+          |> Keyword.put(:verify, verify)
+          |> then(fn opts -> if sni, do: Keyword.put(opts, :server_name_indication, sni), else: opts end)
+        else
+          []
+        end
+
       config :siwapp, Siwapp.Mailer,
         adapter: Swoosh.Adapters.SMTP,
-        relay: System.get_env("SMTP_DOMAIN") || System.get_env("SMTP_HOST") || "localhost",
+        relay: relay,
         username: System.get_env("SMTP_USER"),
         password: System.get_env("SMTP_PASSWORD"),
         ssl: ssl,
         tls: tls,
+        tls_options: tls_options,
         auth: auth,
         port: smtp_port,
         hostname: System.get_env("SMTP_HOST") || System.get_env("SMTP_DOMAIN") || "localhost"
